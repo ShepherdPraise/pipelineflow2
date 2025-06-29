@@ -1,0 +1,69 @@
+name: Sync Dev1-General to QA
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+    types: [closed]
+
+jobs:
+  sync-to-qa:
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Set Commit SHA
+        id: vars
+        run: echo "sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
+      - name: Checkout Dev1-General Repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.PAT_TOKEN }}
+
+      - name: Set Git Identity
+        run: |
+          git config --global user.name "GitHub Action"
+          git config --global user.email "action@github.com"
+
+      - name: Create QA Sync Branch
+        run: |
+          git checkout -b qa-sync-${{ steps.vars.outputs.sha }}
+
+      - name: Update Submodules
+        run: |
+          git submodule update --init --recursive
+          git submodule foreach git fetch origin
+          git submodule foreach git checkout main
+          git submodule foreach git pull origin main
+
+      - name: Commit Submodule Updates
+        run: |
+          git add .
+          git commit -m "Update submodules for QA sync" || echo "No changes to commit"
+
+      - name: Push Changes
+        run: |
+          git push origin qa-sync-${{ steps.vars.outputs.sha }}
+
+      - name: Create PR to QA
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.PAT_TOKEN }}
+          commit-message: "Sync changes from Dev1-General to QA"
+          title: "Sync Dev1-General to QA"
+          body: "Syncs changes from 0-iHealth-Dev1-General/main to iHealth-QA/main, including updated submodules."
+          branch: qa-sync-${{ steps.vars.outputs.sha }}
+          base: main
+          delete-branch: true
+          repo: onehealthconnectapp/iHealth-QA
+
+      - name: Notify Completion
+        run: |
+          echo "Sync from Dev1-General to QA completed successfully."
+          echo "Changes pushed to branch qa-sync-${{ steps.vars.outputs.sha }}."
+          echo "Please review and merge the pull request in iHealth-QA repository."
