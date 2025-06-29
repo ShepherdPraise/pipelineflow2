@@ -19,10 +19,11 @@ jobs:
         id: vars
         run: echo "sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
 
-      - name: Checkout Flow Repository
+      - name: Checkout with full history and submodules
         uses: actions/checkout@v4
         with:
           submodules: recursive
+          fetch-depth: 0
           token: ${{ secrets.PAT_TOKEN }}
 
       - name: Set Git Identity
@@ -30,43 +31,61 @@ jobs:
           git config --global user.name "shepherdpraise"
           git config --global user.email "shepherd.praise@yahoo.com"
 
-      - name: Update Submodules
+      - name: Update and Sync Submodules
         run: |
+          git submodule sync
           git submodule update --init --recursive
           git submodule foreach git fetch origin
           git submodule foreach git checkout main
           git submodule foreach git pull origin main
 
-      - name: Commit Submodule Updates
-        id: commit
+      - name: Commit if changes exist
+        id: commit-check
         run: |
           git add .
-          git diff --cached --quiet && echo "NO_CHANGES=true" >> $GITHUB_ENV || git commit -m "Update submodules for Flow2 sync"
+          if git diff --cached --quiet; then
+            echo "NO_CHANGES=true" >> $GITHUB_ENV
+            echo "No changes to commit."
+          else
+            git commit -m "Update submodules for Flow2 sync"
+          fi
 
-      - name: Skip if no changes
+      - name: Exit if no changes
         if: env.NO_CHANGES == 'true'
-        run: echo "No changes to sync. Exiting early." && exit 0
+        run: echo "No sync required. Exiting."
 
-      - name: Add Flow2 Remote and Push
+      - name: Create clean clone for pushing
+        if: env.NO_CHANGES != 'true'
         run: |
+          git clone . ../clean-push --recursive
+          cd ../clean-push
+          git checkout -b Flow2-sync-${{ steps.vars.outputs.sha }}
+
+      - name: Push to Flow2 from clean repo
+        if: env.NO_CHANGES != 'true'
+        run: |
+          cd ../clean-push
           git remote add flow2 https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/ShepherdPraise/pipelineflow2.git
-          git push flow2 HEAD:Flow2-sync-${{ steps.vars.outputs.sha }}
+          GIT_TRACE=1 GIT_CURL_VERBOSE=1 git push --force flow2 HEAD:Flow2-sync-${{ steps.vars.outputs.sha }}
 
       - name: Install GitHub CLI
+        if: env.NO_CHANGES != 'true'
         run: |
           sudo apt update
           sudo apt install -y gh
 
       - name: Authenticate GitHub CLI
+        if: env.NO_CHANGES != 'true'
         run: |
           echo "${{ secrets.PAT_TOKEN }}" | gh auth login --with-token
 
-      - name: Create Pull Request in Flow2
+      - name: Create PR in pipelineflow2
+        if: env.NO_CHANGES != 'true'
         run: |
           gh repo set-default ShepherdPraise/pipelineflow2
           gh pr create \
             --title "Sync Flow to Flow2" \
-            --body "Syncs changes from ShepherdPraise/pipelineflow to ShepherdPraise/pipelineflow2, including updated submodules." \
+            --body "Automated sync from pipelineflow including submodule updates." \
             --base main \
             --head Flow2-sync-${{ steps.vars.outputs.sha }} \
             --label "automated-sync"
