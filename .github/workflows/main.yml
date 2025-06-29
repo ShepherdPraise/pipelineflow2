@@ -41,22 +41,22 @@ jobs:
 
       - name: Prepare clean sync directory
         run: |
-          mkdir ../sync-dir
-          rsync -av --exclude='.git' ./ ../sync-dir/
+          mkdir -p $RUNNER_TEMP/sync-dir
+          rsync -av --exclude='.git' ./ $RUNNER_TEMP/sync-dir/
 
       - name: Ensure clean clone target
-        run: rm -rf ../pipelineflow2
+        run: rm -rf $RUNNER_TEMP/pipelineflow2
 
       - name: Clone pipelineflow2
         run: |
-          git clone https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/ShepherdPraise/pipelineflow2.git ../pipelineflow2
-          test -d ../pipelineflow2/.git || { echo "❌ .git directory not found in clone target"; exit 1; }
+          git clone https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/ShepherdPraise/pipelineflow2.git $RUNNER_TEMP/pipelineflow2
+          test -d $RUNNER_TEMP/pipelineflow2/.git || { echo "❌ .git directory not found in clone target"; exit 1; }
 
       - name: Copy and commit changes into pipelineflow2
-        working-directory: ../pipelineflow2
+        working-directory: ${{ runner.temp }}/pipelineflow2
         run: |
           git checkout -b Flow2-sync-${{ steps.vars.outputs.sha }}
-          rsync -av --delete ../../sync-dir/ ./
+          rsync -av --delete $RUNNER_TEMP/sync-dir/ ./
           git config user.name "shepherdpraise"
           git config user.email "shepherd.praise@yahoo.com"
           git add .
@@ -80,7 +80,7 @@ jobs:
             --description "PRs created by pipelineflow sync job" || echo "✅ Label already exists"
 
       - name: Create PR in pipelineflow2
-        working-directory: ../pipelineflow2
+        working-directory: ${{ runner.temp }}/pipelineflow2
         run: |
           gh pr create \
             --repo ShepherdPraise/pipelineflow2 \
