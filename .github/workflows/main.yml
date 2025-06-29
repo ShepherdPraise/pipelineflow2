@@ -39,53 +39,38 @@ jobs:
           git submodule foreach git checkout main
           git submodule foreach git pull origin main
 
-      - name: Commit if changes exist
-        id: commit-check
+      - name: Commit Submodule Updates (no-op allowed)
         run: |
           git add .
-          if git diff --cached --quiet; then
-            echo "NO_CHANGES=true" >> $GITHUB_ENV
-            echo "No changes to commit."
-          else
-            git commit -m "Update submodules for Flow2 sync"
-          fi
-
-      - name: Exit if no changes
-        if: env.NO_CHANGES == 'true'
-        run: echo "No sync required. Exiting."
+          git commit -m "Force sync from Flow to Flow2 – SHA ${{ steps.vars.outputs.sha }}" || echo "No changes to commit – proceeding anyway"
 
       - name: Create clean clone for pushing
-        if: env.NO_CHANGES != 'true'
         run: |
           git clone . ../clean-push --recursive
           cd ../clean-push
           git checkout -b Flow2-sync-${{ steps.vars.outputs.sha }}
 
       - name: Push to Flow2 from clean repo
-        if: env.NO_CHANGES != 'true'
         run: |
           cd ../clean-push
           git remote add flow2 https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/ShepherdPraise/pipelineflow2.git
           GIT_TRACE=1 GIT_CURL_VERBOSE=1 git push --force flow2 HEAD:Flow2-sync-${{ steps.vars.outputs.sha }}
 
       - name: Install GitHub CLI
-        if: env.NO_CHANGES != 'true'
         run: |
           sudo apt update
           sudo apt install -y gh
 
       - name: Authenticate GitHub CLI
-        if: env.NO_CHANGES != 'true'
         run: |
           echo "${{ secrets.PAT_TOKEN }}" | gh auth login --with-token
 
       - name: Create PR in pipelineflow2
-        if: env.NO_CHANGES != 'true'
         run: |
           gh repo set-default ShepherdPraise/pipelineflow2
           gh pr create \
-            --title "Sync Flow to Flow2" \
-            --body "Automated sync from pipelineflow including submodule updates." \
+            --title "Force Sync Flow to Flow2" \
+            --body "Forced sync from pipelineflow regardless of changes. SHA: ${{ steps.vars.outputs.sha }}" \
             --base main \
             --head Flow2-sync-${{ steps.vars.outputs.sha }} \
             --label "automated-sync"
