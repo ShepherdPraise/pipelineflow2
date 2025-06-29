@@ -30,6 +30,7 @@ jobs:
         run: |
           git config --global user.name "shepherdpraise"
           git config --global user.email "shepherd.praise@yahoo.com"
+
       - name: Update and Sync Submodules
         run: |
           git submodule sync
@@ -37,34 +38,43 @@ jobs:
           git submodule foreach git fetch origin
           git submodule foreach git checkout main
           git submodule foreach git pull origin main
+
       - name: Commit Submodule Updates (no-op allowed)
         run: |
           git add .
           git commit -m "Force sync from Flow to Flow2 – SHA ${{ steps.vars.outputs.sha }}" || echo "No changes to commit – continuing anyway"
-      - name: Create clean clone for pushing
+
+      - name: Create Sync Branch
         run: |
-          git clone . ../clean-push --recursive
-          cd ../clean-push
           git checkout -b Flow2-sync-${{ steps.vars.outputs.sha }}
-      - name: Push to Flow2 from clean repo
+
+      - name: Push to pipelineflow2
         run: |
-          cd ../clean-push
           git remote add flow2 https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/ShepherdPraise/pipelineflow2.git
-          GIT_TRACE=1 GIT_CURL_VERBOSE=1 git push --force flow2 HEAD:Flow2-sync-${{ steps.vars.outputs.sha }}
+          git push --force flow2 HEAD:Flow2-sync-${{ steps.vars.outputs.sha }}
+
       - name: Install GitHub CLI
         run: |
           sudo apt update
           sudo apt install -y gh
+
       - name: Authenticate GitHub CLI
         run: |
           echo "${{ secrets.PAT_TOKEN }}" | gh auth login --with-token
+
+      - name: Ensure PR label exists
+        run: |
+          gh label create "automated-sync" \
+            --repo ShepherdPraise/pipelineflow2 \
+            --color "0366d6" \
+            --description "PRs created by pipelineflow sync job" || echo "✅ Label already exists"
+
       - name: Create PR in pipelineflow2
         run: |
-          cd ../clean-push
           gh pr create \
             --repo ShepherdPraise/pipelineflow2 \
             --title "Force Sync Flow to Flow2" \
-            --body "Forced sync from pipelineflow regardless of changes. SHA: ${{ steps.vars.outputs.sha }}" \
+            --body "Forced sync from pipelineflow. SHA: ${{ steps.vars.outputs.sha }}" \
             --base main \
             --head Flow2-sync-${{ steps.vars.outputs.sha }} \
             --label "automated-sync"
