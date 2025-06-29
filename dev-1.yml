@@ -1,4 +1,4 @@
-name: Sync Dev1-General to QA
+name: Sync Flow to Flow2
 
 on:
   push:
@@ -19,7 +19,7 @@ jobs:
         id: vars
         run: echo "sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
 
-      - name: Checkout Dev1-General Repository
+      - name: Checkout Flow Repository
         uses: actions/checkout@v4
         with:
           submodules: recursive
@@ -27,12 +27,12 @@ jobs:
 
       - name: Set Git Identity
         run: |
-          git config --global user.name "GitHub Action"
-          git config --global user.email "action@github.com"
+          git config --global user.name "shepherdpraise"
+          git config --global user.email "shepherd.praise@yahoo.com"
 
-      - name: Create QA Sync Branch
+      - name: Create Flow2 Sync Branch
         run: |
-          git checkout -b qa-sync-${{ steps.vars.outputs.sha }}
+          git checkout -b Flow2-sync-${{ steps.vars.outputs.sha }}
 
       - name: Update Submodules
         run: |
@@ -44,26 +44,26 @@ jobs:
       - name: Commit Submodule Updates
         run: |
           git add .
-          git commit -m "Update submodules for QA sync" || echo "No changes to commit"
+          git commit -m "Update submodules for Flow2 sync" || echo "No changes to commit"
 
       - name: Push Changes
         run: |
-          git push origin qa-sync-${{ steps.vars.outputs.sha }}
+          git push origin Flow2-sync-${{ steps.vars.outputs.sha }}
 
-      - name: Create PR to QA
+      - name: Create PR to Flow2
         uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.PAT_TOKEN }}
-          commit-message: "Sync changes from Dev1-General to QA"
-          title: "Sync Dev1-General to QA"
-          body: "Syncs changes from 0-iHealth-Dev1-General/main to iHealth-QA/main, including updated submodules."
-          branch: qa-sync-${{ steps.vars.outputs.sha }}
+          commit-message: "Sync changes from Flow to Flow2"
+          title: "Sync Flow to Flow2"
+          body: "Syncs changes from ShepherdPraise/pipelineflow to ShepherdPraise/pipelineflow2, including updated submodules."
+          branch: Flow2-sync-${{ steps.vars.outputs.sha }}
           base: main
           delete-branch: true
-          repo: onehealthconnectapp/iHealth-QA
+          repo: ShepherdPraise/pipelineflow2
 
       - name: Notify Completion
         run: |
-          echo "Sync from Dev1-General to QA completed successfully."
-          echo "Changes pushed to branch qa-sync-${{ steps.vars.outputs.sha }}."
-          echo "Please review and merge the pull request in iHealth-QA repository."
+          echo "Sync from flow to flow2 completed successfully."
+          echo "Changes pushed to branch flow2-sync-${{ steps.vars.outputs.sha }}."
+          echo "Please review and merge the pull request in flow2 repository."
