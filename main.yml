@@ -1,0 +1,69 @@
+name: Sync Flow to Flow2
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+    types: [closed]
+
+jobs:
+  sync-to-qa:
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Set Commit SHA
+        id: vars
+        run: echo "sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
+      - name: Checkout Flow Repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.PAT_TOKEN }}
+
+      - name: Set Git Identity
+        run: |
+          git config --global user.name "shepherdpraise"
+          git config --global user.email "shepherd.praise@yahoo.com"
+
+      - name: Create Flow2 Sync Branch
+        run: |
+          git checkout -b Flow2-sync-${{ steps.vars.outputs.sha }}
+
+      - name: Update Submodules
+        run: |
+          git submodule update --init --recursive
+          git submodule foreach git fetch origin
+          git submodule foreach git checkout main
+          git submodule foreach git pull origin main
+
+      - name: Commit Submodule Updates
+        run: |
+          git add .
+          git commit -m "Update submodules for Flow2 sync" || echo "No changes to commit"
+
+      - name: Push Changes
+        run: |
+          git push origin Flow2-sync-${{ steps.vars.outputs.sha }}
+
+      - name: Create PR to Flow2
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.PAT_TOKEN }}
+          commit-message: "Sync changes from Flow to Flow2"
+          title: "Sync Flow to Flow2"
+          body: "Syncs changes from ShepherdPraise/pipelineflow to ShepherdPraise/pipelineflow2, including updated submodules."
+          branch: Flow2-sync-${{ steps.vars.outputs.sha }}
+          base: main
+          delete-branch: true
+          repo: ShepherdPraise/pipelineflow2
+
+      - name: Notify Completion
+        run: |
+          echo "Sync from flow to flow2 completed successfully."
+          echo "Changes pushed to branch flow2-sync-${{ steps.vars.outputs.sha }}."
+          echo "Please review and merge the pull request in flow2 repository."

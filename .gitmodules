@@ -1,0 +1,3 @@
+[submodule "libresign"]
+	path = libresign
+	url = https://github.com/ShepherdPraise/libresign.git
