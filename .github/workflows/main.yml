@@ -19,7 +19,7 @@ jobs:
         id: vars
         run: echo "sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
 
-      - name: Checkout with full history and submodules
+      - name: Checkout pipelineflow with full history and submodules
         uses: actions/checkout@v4
         with:
           submodules: recursive
@@ -39,22 +39,29 @@ jobs:
           git submodule foreach git checkout main
           git submodule foreach git pull origin main
 
-      - name: Commit Submodule Updates (no-op allowed)
+      - name: Prepare clean sync directory
         run: |
-          git add .
-          git commit -m "Force sync from Flow to Flow2 – SHA ${{ steps.vars.outputs.sha }}" || echo "No changes to commit – continuing anyway"
+          mkdir ../sync-dir
+          rsync -av --exclude='.git' ./ ../sync-dir/
 
-      - name: Create clean clone for pushing
+      - name: Ensure clean clone target
+        run: rm -rf ../pipelineflow2
+
+      - name: Clone pipelineflow2
         run: |
-          git clone . ../clean-push --recursive
-          cd ../clean-push
+          git clone https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/ShepherdPraise/pipelineflow2.git ../pipelineflow2
+          test -d ../pipelineflow2/.git || { echo "❌ .git directory not found in clone target"; exit 1; }
+
+      - name: Copy and commit changes into pipelineflow2
+        working-directory: ../pipelineflow2
+        run: |
           git checkout -b Flow2-sync-${{ steps.vars.outputs.sha }}
-
-      - name: Push to Flow2 from clean repo
-        run: |
-          cd ../clean-push
-          git remote add flow2 https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/ShepherdPraise/pipelineflow2.git
-          GIT_TRACE=1 GIT_CURL_VERBOSE=1 git push --force flow2 HEAD:Flow2-sync-${{ steps.vars.outputs.sha }}
+          rsync -av --delete ../../sync-dir/ ./
+          git config user.name "shepherdpraise"
+          git config user.email "shepherd.praise@yahoo.com"
+          git add .
+          git commit -m "Force sync from pipelineflow to pipelineflow2 – SHA ${{ steps.vars.outputs.sha }}" || echo "No changes to commit"
+          git push origin Flow2-sync-${{ steps.vars.outputs.sha }}
 
       - name: Install GitHub CLI
         run: |
@@ -65,13 +72,20 @@ jobs:
         run: |
           echo "${{ secrets.PAT_TOKEN }}" | gh auth login --with-token
 
-      - name: Create PR in pipelineflow2
+      - name: Ensure PR label exists in pipelineflow2
         run: |
-          cd ../clean-push
+          gh label create "automated-sync" \
+            --repo ShepherdPraise/pipelineflow2 \
+            --color "0366d6" \
+            --description "PRs created by pipelineflow sync job" || echo "✅ Label already exists"
+
+      - name: Create PR in pipelineflow2
+        working-directory: ../pipelineflow2
+        run: |
           gh pr create \
             --repo ShepherdPraise/pipelineflow2 \
             --title "Force Sync Flow to Flow2" \
-            --body "Forced sync from pipelineflow regardless of changes. SHA: ${{ steps.vars.outputs.sha }}" \
+            --body "Forced sync from pipelineflow. SHA: ${{ steps.vars.outputs.sha }}" \
             --base main \
             --head Flow2-sync-${{ steps.vars.outputs.sha }} \
             --label "automated-sync"
