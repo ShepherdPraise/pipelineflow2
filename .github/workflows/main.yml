@@ -42,7 +42,7 @@ jobs:
       - name: Commit Submodule Updates (no-op allowed)
         run: |
           git add .
-          git commit -m "Force sync from Flow to Flow2 – SHA ${{ steps.vars.outputs.sha }}" || echo "No changes to commit – proceeding anyway"
+          git commit -m "Force sync from Flow to Flow2 – SHA ${{ steps.vars.outputs.sha }}" || echo "No changes to commit – continuing anyway"
 
       - name: Create clean clone for pushing
         run: |
@@ -67,8 +67,9 @@ jobs:
 
       - name: Create PR in pipelineflow2
         run: |
-          gh repo set-default ShepherdPraise/pipelineflow2
+          cd ../clean-push
           gh pr create \
+            --repo ShepherdPraise/pipelineflow2 \
             --title "Force Sync Flow to Flow2" \
             --body "Forced sync from pipelineflow regardless of changes. SHA: ${{ steps.vars.outputs.sha }}" \
             --base main \
