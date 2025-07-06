@@ -1,4 +1,4 @@
-name: Overwrite pipelineflow2 from pipelineflow (Preserve History, Sync Submodules)
+name: Merge pipelineflow2 from pipelineflow (Preserve History, Sync Submodules)
 
 on:
   push:
