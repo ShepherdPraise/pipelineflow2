@@ -1,4 +1,4 @@
-name: Overwrite pipelineflow2 from pipelineflow (Preserve History, Sync Submodules)
+name: Merge pipelineflow2 from pipelineflow (Preserve History, Sync Submodules)
 
 on:
   push:
@@ -99,3 +99,4 @@ jobs:
             --base main \
             --head Flow2-overwrite-${{ steps.vars.outputs.sha }} \
             --label "automated-sync"
+
